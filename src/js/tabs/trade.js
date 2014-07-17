@@ -167,17 +167,24 @@ TradeTab.prototype.angular = function(module)
      */
     $scope.cancel_order = function ()
     {
-      var seq = this.entry ? this.entry.seq : this.order.Sequence;
-
-      var tx = $network.remote.transaction();
+      var seq   = this.entry ? this.entry.seq : this.order.Sequence;
+      var order = this;      
+      var tx    = $network.remote.transaction();
+      
+      $scope.cancelError = null;
+                  
       tx.offer_cancel(id.account, seq);
       tx.on('success', function() {
         $rpTracker.track('Trade order cancellation', {
           'Status': 'success'
         });
       });
-      // TODO handle this
+
       tx.on('error', function (err) {
+        console.log("cancel error: ", err);
+        order.cancelling   = false;
+        $scope.cancelError = err.engine_result_message;
+        
         $rpTracker.track('Trade order cancellation', {
           'Status': 'error',
           'Message': err.engine_result
@@ -185,14 +192,18 @@ TradeTab.prototype.angular = function(module)
       });
 
       keychain.requestSecret(id.account, id.username, function (err, secret) {
-        // XXX Error handling
-        if (err) return;
+        if (err) {
+          
+          //err should equal 'canceled' here, other errors are not passed through 
+          order.cancelling = false;
+          return;
+        }
 
         tx.secret(secret);
         tx.submit();
       });
 
-      this.cancelling = true;
+      order.cancelling = true;
     };
 
     /**
